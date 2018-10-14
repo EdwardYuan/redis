@@ -61,6 +61,24 @@ func (c *baseClient) newConn() (*pool.Conn, error) {
 }
 
 func (c *baseClient) getConn() (*pool.Conn, error) {
+	if c.opt.Limiter != nil {
+		err := c.opt.Limiter.Take()
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	cn, err := c._getConn()
+	if err != nil {
+		if c.opt.Limiter != nil {
+			c.opt.Limiter.Put(err)
+		}
+		return nil, err
+	}
+	return cn, nil
+}
+
+func (c *baseClient) _getConn() (*pool.Conn, error) {
 	cn, err := c.connPool.Get()
 	if err != nil {
 		return nil, err
@@ -78,6 +96,10 @@ func (c *baseClient) getConn() (*pool.Conn, error) {
 }
 
 func (c *baseClient) releaseConn(cn *pool.Conn, err error) {
+	if c.opt.Limiter != nil {
+		c.opt.Limiter.Put(err)
+	}
+
 	if internal.IsBadConn(err, false) {
 		c.connPool.Remove(cn)
 	} else {
@@ -86,6 +108,10 @@ func (c *baseClient) releaseConn(cn *pool.Conn, err error) {
 }
 
 func (c *baseClient) releaseConnStrict(cn *pool.Conn, err error) {
+	if c.opt.Limiter != nil {
+		c.opt.Limiter.Put(err)
+	}
+
 	if err == nil || internal.IsRedisError(err) {
 		c.connPool.Put(cn)
 	} else {

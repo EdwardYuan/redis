@@ -14,6 +14,11 @@ import (
 	"github.com/go-redis/redis/internal/pool"
 )
 
+type Limiter interface {
+	Take() error
+	Put(error)
+}
+
 type Options struct {
 	// The network type, either tcp or unix.
 	// Default is tcp.
@@ -84,6 +89,8 @@ type Options struct {
 
 	// TLS Config to use. When set TLS will be negotiated.
 	TLSConfig *tls.Config
+
+	Limiter Limiter
 }
 
 func (opt *Options) init() {
